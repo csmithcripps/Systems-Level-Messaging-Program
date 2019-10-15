@@ -12,6 +12,10 @@
 #include <errno.h>
 
 
+// Definitions Header File
+#include "defs.h"
+
+
 /**************************** Global Constants *******************************/
 #define ARRAY_SIZE 30 /* Size of array to receive */
 

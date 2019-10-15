@@ -5,10 +5,9 @@ all: server client
 	rm -f *.o
 	@echo Compilation finished!
 
-client: chatClient.o 
-	$(CC) $(CFLAGS) -o client chatClient.o 
+client: chatClient.o defs.h
+	$(CC) $(CFLAGS) -o client chatClient.o defs.h
 
 
-server: chatServer.o  
-	$(CC) $(CFLAGS) -o server chatServer.o  
-	
+server: chatServer.o  defs.h
+	$(CC) $(CFLAGS) -o server chatServer.o  defs.h

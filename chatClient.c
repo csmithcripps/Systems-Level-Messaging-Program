@@ -12,6 +12,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+
+// Definitions Header File
+#include "defs.h"
+
 /**************************** Global Constants *******************************/
 #define BUFFERSIZE 1024 /* max number of bytes we can get at once */
 
@@ -28,27 +32,6 @@ void exitGracefully();
 void sendRequest();
 void connectWithServer(char* argv[]);
 void printFromRecv();
-
-
-/********************* THIS CAN BE ADDED TO UTILS FILE ************************/
-
-typedef enum {
-    SUB,
-    CHANNELS,
-    UNSUB,
-    NEXT ,
-    LIVEFEED,
-    LIVEFEED_CHANNEL,
-    SEND,
-    BYE
-} req_t;
-
-
-typedef struct {
-    req_t request_type;
-    int channel_id;
-    char message_text[1024];
-} serv_req_t;
 
 
 /********************************* Main Code *********************************/
