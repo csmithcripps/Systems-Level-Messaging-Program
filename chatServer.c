@@ -91,27 +91,18 @@ int main(int argc, char *argv[])
 			   inet_ntoa(their_addr.sin_addr));
 		if (!fork())
 		{ /* this is the child process */
+			int CONNECTED = 1;
 
-			/* Call method to recieve array data - Uncomment this line once function implemented */
-			int *results = Receive_Array_Int_Data(new_fd, ARRAY_SIZE);
+			while(CONNECTED){
+				/* Call method to recieve array data - Uncomment this line once function implemented */
+				int *results = Receive_Array_Int_Data(new_fd, ARRAY_SIZE);
 
-			/* Print out the array results sent by client */
-			uint32_t recvVal;
-			for (int i = 0; i < ARRAY_SIZE; i++)
-			{
-				recvVal = results[i];
-				printf("The Value of index [%d] is %d \n", i, recvVal);
 			}
 
-			if (send(new_fd, "All of array data received by server\n", 40, 0) == -1)
-				perror("send");
+
 			close(new_fd);
 			exit(0);
 		}
-		close(new_fd); /* parent doesn't need this */
-
-		while (waitpid(-1, NULL, WNOHANG) > 0)
-			; /* clean up child processes */
 	}
 }
 
@@ -130,7 +121,6 @@ int *Receive_Array_Int_Data(int socket_identifier, int size)
 		}
 		arrayData[i] = ntohl(spinVal);
 	}
-	printf("Recieved Data\n\n");
 	return arrayData;
 }
 

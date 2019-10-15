@@ -33,23 +33,22 @@ void printFromRecv();
 /********************* THIS CAN BE ADDED TO UTILS FILE ************************/
 
 typedef enum {
-    sub,
-    channels,
-    unsub,
-    next,
-    livefeed,
-    livefeed_channel,
-    next,
-    send,
-    bye
-} req_t
+    SUB,
+    CHANNELS,
+    UNSUB,
+    NEXT ,
+    LIVEFEED,
+    LIVEFEED_CHANNEL,
+    SEND,
+    BYE
+} req_t;
 
 
 typedef struct {
     req_t request_type;
     int channel_id;
     char message_text[1024];
-} serv_req_t
+} serv_req_t;
 
 
 /********************************* Main Code *********************************/
@@ -58,7 +57,7 @@ int main(int argc, char* argv[]){
     signal(SIGINT, exitGracefully);
     signal(SIGHUP, exitGracefully);
 
-	/* If Incorrect Number of input args */
+	/* If Incorrect Number of input args exit*/
     if (argc != 3){
         printf("\nUsage --> %s [hostname] [port]\n\n", argv[0]);
         exit(EXIT_FAILURE);
