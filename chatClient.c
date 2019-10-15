@@ -27,7 +27,29 @@ void commandHandler();
 void exitGracefully();
 void sendRequest();
 void connectWithServer(char* argv[]);
+void printFromRecv();
 
+
+/********************* THIS CAN BE ADDED TO UTILS FILE ************************/
+
+typedef enum {
+    sub,
+    channels,
+    unsub,
+    next,
+    livefeed,
+    livefeed_channel,
+    next,
+    send,
+    bye
+} req_t
+
+
+typedef struct {
+    req_t request_type;
+    int channel_id;
+    char message_text[1024];
+} serv_req_t
 
 
 /********************************* Main Code *********************************/
@@ -56,6 +78,14 @@ int main(int argc, char* argv[]){
 
 /****************************** Function Defs ********************************/
 
+
+
+/*
+Func:
+        connectWithServer()
+Desc:
+        using the console input connect with the server on the given socket
+*/
 void connectWithServer(char* argv[]){
 	struct hostent *host;
 	struct sockaddr_in serverAddr; /* connector's address information */
@@ -89,7 +119,7 @@ void exitGracefully(){
 
 
     if (socket_fd != 0){
-        // coord_req_t req;
+        // serv_req_t req;
         // req.request_type = quit;
         // sendRequest(req);
         shutdown(socket_fd,SHUT_RDWR);
@@ -100,18 +130,28 @@ void exitGracefully(){
     exit(EXIT_SUCCESS);
 }
 
+
+/*
+Func:
+        commandHandler()
+Desc:
+        Take Console input and send requests to server.
+*/
 void commandHandler(){
 }
 
 
+void printFromRecv(){
+
+}
 
 	
 
 /*
-Function: 
-    sendRequest
-Description:
-    Send request code to Server 
+Func: 
+        sendRequest
+Desc:
+        Send request code to Server 
 
 */
 // void sendRequest(int socket_id, int requestType) {
