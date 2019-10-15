@@ -25,7 +25,7 @@
 int sockfd, new_fd;			   /* listen on sock_fd, new connection on new_fd */
 
 /***************************** Function Inits ********************************/
-int *Receive_Array_Int_Data(int new_fd, int size);
+serv_req_t receive_user_req(int socket_fd);
 void closeServer();
 
 
@@ -97,13 +97,24 @@ int main(int argc, char *argv[])
 		{ /* this is the child process */
 			int CONNECTED = 1;
 
+
 			while(CONNECTED){
 				/* Call method to recieve array data - Uncomment this line once function implemented */
-				int *results = Receive_Array_Int_Data(new_fd, ARRAY_SIZE);
+				serv_req_t request = receive_user_req(new_fd);
+				
+				switch (request.request_type)
+				{
+				case BYE:
+					CONNECTED = 0;
+					break;
+				
+				default:
+					break;
+				}
 
 			}
 
-
+			printf("<< Connection From %d Closed >>\n", new_fd);
 			close(new_fd);
 			exit(0);
 		}
@@ -112,25 +123,19 @@ int main(int argc, char *argv[])
 
 
 /****************************** Function Defs ********************************/
-int *Receive_Array_Int_Data(int socket_identifier, int size)
-{
-	int *arrayData = malloc(sizeof(int) * size);
-	int spinVal;
-	for (int i = 0; i < size; i++)
-	{
-		if (recv(socket_identifier, &spinVal, sizeof(int), 0) == -1)
-		{
-			// continue;
-			perror("Receiving Data");
-		}
-		arrayData[i] = ntohl(spinVal);
-	}
-	return arrayData;
+serv_req_t receive_user_req(int socket_fd){
+    serv_req_t request;
+
+    if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
+        perror("Receiving user coord request");
+    }
+
+    return request;
 }
 
 
 void closeServer(){
-    printf("\nServer is shutting down now...\n");
+    printf("\n<< SERVER CLOSED >>\n");
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
     exit(EXIT_SUCCESS);

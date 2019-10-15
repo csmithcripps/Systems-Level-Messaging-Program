@@ -10,7 +10,8 @@ typedef enum {
     LIVEFEED,
     LIVEFEED_CHANNEL,
     SEND,
-    BYE
+    BYE,
+    INVALID
 } req_t;
 
 

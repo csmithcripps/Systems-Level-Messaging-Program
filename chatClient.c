@@ -27,7 +27,7 @@
 int socket_fd = 0;
 
 /***************************** Function Inits ********************************/
-void commandHandler();
+serv_req_t commandHandler();
 void exitGracefully();
 void sendRequest();
 void connectWithServer(char* argv[]);
@@ -51,7 +51,20 @@ int main(int argc, char* argv[]){
     printf("<< Connected Chat Client Successfully >>\n\n");
 
     while(1){
-        // commandHandler();
+        serv_req_t request = commandHandler();
+        switch (request.request_type)
+        {
+        case INVALID:
+            break;
+
+        case BYE:
+            sendRequest(request);
+            exitGracefully();
+        
+        default:
+            sendRequest(request);
+            break;
+        }
     }
 
 	return 0;
@@ -113,13 +126,46 @@ void exitGracefully(){
 }
 
 
+req_t checkRequestType(char req[]){
+    req_t request_Type;
+    if (strcmp(req, "BYE")==0){  
+        request_Type = BYE;
+    }
+    else{
+        request_Type = INVALID;
+    }
+    return request_Type;
+}
+
 /*
 Func:
         commandHandler()
 Desc:
         Take Console input and send requests to server.
 */
-void commandHandler(){
+serv_req_t commandHandler(){
+        serv_req_t request;
+
+        char req[50];
+        printf("   --> ");
+        scanf("%s", req);
+
+        req_t reqType = checkRequestType(req);
+
+        switch (reqType)
+        {
+        case BYE:
+            request.request_type = BYE;
+            break;
+        
+        default:
+            printf("<< INVALID INPUT >>");
+            request.request_type = INVALID;
+            break;
+        }
+
+
+        return request;
 }
 
 
@@ -136,15 +182,15 @@ Desc:
         Send request code to Server 
 
 */
-// void sendRequest(int socket_id, int requestType) {
-// 	int i;
-// 	uint32_t sendVal;
-// 	for (i = 0; i < ARRAY_SIZE; i++) {
-// 		sendVal = htonl(myArray[i]);
-// 		send(socket_id, &sendVal, sizeof(uint32_t), 0);
-// 		printf("Array[%d] = %d\n", i, myArray[i]);
-// 	}
-// 	fflush(stdout);
-// }
+void sendRequest(serv_req_t request) {
+
+    if (send(socket_fd, &request, sizeof(serv_req_t), PF_UNSPEC) == -1){
+        perror("Sending request");
+    }
+
+    //Needs to wait for response
+
+
+}
 
 
