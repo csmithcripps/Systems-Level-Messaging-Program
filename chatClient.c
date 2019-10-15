@@ -32,6 +32,7 @@ void exitGracefully();
 void sendRequest();
 void connectWithServer(char* argv[]);
 void printFromRecv();
+req_t checkRequestType(char req[]);
 
 
 /********************************* Main Code *********************************/
@@ -55,10 +56,10 @@ int main(int argc, char* argv[]){
         switch (request.request_type)
         {
         case INVALID:
+            printf("\n<< INVALID INPUT >>\n");
             break;
 
         case BYE:
-            sendRequest(request);
             exitGracefully();
         
         default:
@@ -76,10 +77,10 @@ int main(int argc, char* argv[]){
 
 
 /*
-Func:
-        connectWithServer()
-Desc:
-        using the console input connect with the server on the given socket
+func:       using the console input connect with the server on the given socket
+param:      
+            argv[]:
+                    Input arguments from terminal
 */
 void connectWithServer(char* argv[]){
 	struct hostent *host;
@@ -110,13 +111,17 @@ void connectWithServer(char* argv[]){
 
 }
 
+
+/*
+func:       exit program and close socket.
+*/
 void exitGracefully(){
 
 
     if (socket_fd != 0){
-        // serv_req_t req;
-        // req.request_type = quit;
-        // sendRequest(req);
+        serv_req_t req;
+        req.request_type = BYE;
+        sendRequest(req);
         shutdown(socket_fd,SHUT_RDWR);
         close(socket_fd);
     }
@@ -126,16 +131,7 @@ void exitGracefully(){
 }
 
 
-req_t checkRequestType(char req[]){
-    req_t request_Type;
-    if (strcmp(req, "BYE")==0){  
-        request_Type = BYE;
-    }
-    else{
-        request_Type = INVALID;
-    }
-    return request_Type;
-}
+
 
 /*
 Func:
@@ -159,7 +155,6 @@ serv_req_t commandHandler(){
             break;
         
         default:
-            printf("<< INVALID INPUT >>");
             request.request_type = INVALID;
             break;
         }
@@ -169,11 +164,21 @@ serv_req_t commandHandler(){
 }
 
 
+req_t checkRequestType(char req[]){
+    req_t request_Type;
+    if (strcmp(req, "BYE")==0){  
+        request_Type = BYE;
+    }
+    else{
+        request_Type = INVALID;
+    }
+    return request_Type;
+}
+
+
 void printFromRecv(){
 
 }
-
-	
 
 /*
 Func: 

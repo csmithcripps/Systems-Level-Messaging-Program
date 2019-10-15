@@ -91,8 +91,7 @@ int main(int argc, char *argv[])
 			perror("accept");
 			continue;
 		}
-		printf("server: got connection from %s\n",
-			   inet_ntoa(their_addr.sin_addr));
+		printf("<< Got Connection With id %d From %s >>\n", new_fd, inet_ntoa(their_addr.sin_addr));
 		if (!fork())
 		{ /* this is the child process */
 			int CONNECTED = 1;
@@ -109,6 +108,7 @@ int main(int argc, char *argv[])
 					break;
 				
 				default:
+					printf("<< Invalid Request Received From %d >>\n", new_fd);
 					break;
 				}
 
@@ -118,6 +118,8 @@ int main(int argc, char *argv[])
 			close(new_fd);
 			exit(0);
 		}
+
+		new_fd = 0;
 	}
 }
 
@@ -135,7 +137,16 @@ serv_req_t receive_user_req(int socket_fd){
 
 
 void closeServer(){
-    printf("\n<< SERVER CLOSED >>\n");
+	switch (new_fd)
+	{
+	case 0:
+		printf("\n<< Closing Server-Parent >>\n");
+		break;
+	
+	default:
+		printf("\n<< Closed Connection With id: %d >>\n", new_fd);
+		break;
+	}
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
     exit(EXIT_SUCCESS);
