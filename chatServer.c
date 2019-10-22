@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/shm.h>
 
 
 // Definitions Header File
@@ -23,11 +24,15 @@
 
 #define RETURNED_ERROR -1
 int sockfd, new_fd;			   /* listen on sock_fd, new connection on new_fd */
+int key = 5432;
 
 /***************************** Function Inits ********************************/
-serv_req_t receive_user_req(int socket_fd);
+serv_req_t handle_user_reqt(int socket_fd);
 void closeServer();
-
+void printClientRequest(serv_req_t request);
+void sendResponse(serv_resp_t response);
+sharedMemory_t * init_Shared_Memory(int key);
+sharedMemory_t * get_Shared_Memory(int key);
 
 
 /********************************* Main Code *********************************/
@@ -40,7 +45,6 @@ int main(int argc, char *argv[])
 	struct sockaddr_in my_addr;	/* my address information */
 	struct sockaddr_in their_addr; /* connector's address information */
 	socklen_t sin_size;
-	int i = 0;
 
 	/* Get port number for server to listen on */
 
@@ -78,7 +82,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	printf("server starts listnening ...\n");
+	sharedMemory_t * p_channelList =  init_Shared_Memory(key);
+
+	
+
+    printf("<< Started Execution of Chat Server >>\n\n");
 
 	/* repeat: accept, send, close the connection */
 	/* for every accepted connection, use a sepetate process or thread to serve it */
@@ -91,27 +99,18 @@ int main(int argc, char *argv[])
 			perror("accept");
 			continue;
 		}
-		printf("<< Got Connection With id %d From %s >>\n", new_fd, inet_ntoa(their_addr.sin_addr));
+		printf("## NEW CONNECTION\n##  Client_id: %d\n##  IP: %s\n", new_fd, inet_ntoa(their_addr.sin_addr));
 		if (!fork())
 		{ /* this is the child process */
 			int CONNECTED = 1;
-
+			sharedMemory_t * p_channelList =  get_Shared_Memory(key);
 
 			while(CONNECTED){
 				/* Call method to recieve array data - Uncomment this line once function implemented */
-				serv_req_t request = receive_user_req(new_fd);
-				
-				switch (request.request_type)
-				{
-				case BYE:
+				serv_req_t request = handle_user_reqt(new_fd);
+				if (request.request_type == BYE){
 					CONNECTED = 0;
-					break;
-				
-				default:
-					printf("<< Invalid Request Received From %d >>\n", new_fd);
-					break;
 				}
-
 			}
 
 			printf("<< Connection From %d Closed >>\n", new_fd);
@@ -125,13 +124,28 @@ int main(int argc, char *argv[])
 
 
 /****************************** Function Defs ********************************/
-serv_req_t receive_user_req(int socket_fd){
+serv_req_t handle_user_reqt(int socket_fd){
     serv_req_t request;
 
     if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
         perror("Receiving user coord request");
     }
+	printClientRequest(request);
 
+	serv_resp_t response;
+	
+	switch (request.request_type)
+	{
+	case BYE:
+		response.type = PRINT;
+		strcpy(response.message_text, "Server Connection Closed");
+		break;
+	
+	default:
+		printf("<< Invalid Request Received From %d >>\n", new_fd);
+		break;
+	}
+	sendResponse(response);
     return request;
 }
 
@@ -145,9 +159,78 @@ void closeServer(){
 	
 	default:
 		printf("\n<< Closed Connection With id: %d >>\n", new_fd);
+		serv_resp_t closeClient;
+		closeClient.type = CLOSE;
+		sendResponse(closeClient);
 		break;
 	}
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
     exit(EXIT_SUCCESS);
+}
+
+
+
+void printClientRequest(serv_req_t request){
+	printf("\n## CLIENT REQUEST\n##  Client_id: %d\n", new_fd);
+	switch (request.request_type)
+	{
+	case BYE:
+		printf("##  Req_Type: BYE\n");
+		printf("##  Action: Close Connection With This Client\n");
+		break;
+	
+	default:
+		printf("##  Req_Type: Unknown\n");
+		printf("##  Action: This Request Code is INVALID or Not Yet Fully Implemented\n");
+		break;
+	}
+	printf("\n");
+}
+
+
+void sendResponse(serv_resp_t response) {
+
+    if (send(new_fd, &response, sizeof(serv_resp_t), PF_UNSPEC) == -1){
+        perror("Sending request");
+    }
+
+}
+
+
+
+
+sharedMemory_t * init_Shared_Memory(int key){
+	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
+	int id;
+
+	for (int i=0; i<255; i++){
+		p_ChannelList->channels[i].numMsgs = 0;
+	}
+
+	if ((id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0666)) < 0)
+    {
+        perror("SHMGET");
+        exit(1);
+    }
+
+
+    if((p_ChannelList = shmat(id, 0, 0)) == (sharedMemory_t *) -1)
+    {
+        perror("SHMAT");
+        exit(1);
+	}
+
+	return p_ChannelList;
+}
+
+
+sharedMemory_t * get_Shared_Memory(int key){
+	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
+	int id;
+
+	id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0644);
+    p_ChannelList = shmat(id, 0, 0);
+
+	return p_ChannelList;
 }

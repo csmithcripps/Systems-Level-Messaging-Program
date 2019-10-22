@@ -33,6 +33,8 @@ void sendRequest();
 void connectWithServer(char* argv[]);
 void printFromRecv();
 req_t checkRequestType(char req[]);
+void handleResponse(serv_resp_t response);
+void printHelp();
 
 
 /********************************* Main Code *********************************/
@@ -53,19 +55,6 @@ int main(int argc, char* argv[]){
 
     while(1){
         serv_req_t request = commandHandler();
-        switch (request.request_type)
-        {
-        case INVALID:
-            printf("\n<< INVALID INPUT >>\n");
-            break;
-
-        case BYE:
-            exitGracefully();
-        
-        default:
-            sendRequest(request);
-            break;
-        }
     }
 
 	return 0;
@@ -77,8 +66,8 @@ int main(int argc, char* argv[]){
 
 
 /*
-func:       using the console input connect with the server on the given socket
-param:      
+Func:       using the console input connect with the server on the given socket
+Param:      
             argv[]:
                     Input arguments from terminal
 */
@@ -113,7 +102,7 @@ void connectWithServer(char* argv[]){
 
 
 /*
-func:       exit program and close socket.
+Func:       exit program and close socket.
 */
 void exitGracefully(){
 
@@ -134,40 +123,54 @@ void exitGracefully(){
 
 
 /*
-Func:
-        commandHandler()
-Desc:
-        Take Console input and send requests to server.
+Func:       Create server requests (serv_req_t) from user inputs
 */
 serv_req_t commandHandler(){
         serv_req_t request;
 
         char req[50];
-        printf("   --> ");
+        printf("\n --> ");
         scanf("%s", req);
 
-        req_t reqType = checkRequestType(req);
+        request.request_type = checkRequestType(req);
 
-        switch (reqType)
+        switch (request.request_type)
         {
+        case HELP:
+            printHelp();
+            break;
+
         case BYE:
-            request.request_type = BYE;
+            exitGracefully();
+        
+        case INVALID:
+            printf("\n<< INVALID INPUT >>\n");
             break;
         
         default:
-            request.request_type = INVALID;
+            sendRequest(request);
             break;
         }
-
 
         return request;
 }
 
-
+/*
+Func:       Take user string and convert to requestT type code (req_t)
+Param:
+            req[]:
+                    User input str
+Return:
+            request_Type:
+                    (req_t enum) to denote the request code.
+*/
 req_t checkRequestType(char req[]){
     req_t request_Type;
     if (strcmp(req, "BYE")==0){  
         request_Type = BYE;
+    }
+    else if (strcmp(req, "HELP")==0){
+        request_Type = HELP;
     }
     else{
         request_Type = INVALID;
@@ -193,9 +196,32 @@ void sendRequest(serv_req_t request) {
         perror("Sending request");
     }
 
-    //Needs to wait for response
+    serv_resp_t response;
+    if (recv(socket_fd, &response, sizeof(serv_resp_t), PF_UNSPEC) == -1){
+        perror("Receiving response");
+    }
+    handleResponse(response);
+}
 
-
+void handleResponse(serv_resp_t response){
+	switch (response.type)
+	{
+	case CLOSE:
+        printf("## Close Request from Server");
+        exitGracefully();
+		break;
+	
+	default:
+        printf("\n%s\n", response.message_text);
+		break;
+	}
+	printf("\n");
 }
 
 
+void printHelp(){
+    printf("## AVAILABLE COMMANDS\n");
+    printf("## BYE --> Close connection and exit.");
+    
+    printf("\n\n");
+}
