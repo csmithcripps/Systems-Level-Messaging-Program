@@ -18,12 +18,9 @@
 
 
 /**************************** Global Constants *******************************/
-#define ARRAY_SIZE 30 /* Size of array to receive */
 
 #define BACKLOG 10 /* how many pending connections queue will hold */
-
-#define RETURNED_ERROR -1
-int sockfd, new_fd;			   /* listen on sock_fd, new connection on new_fd */
+int sockfd, client_fd;			   /* listen on sock_fd, new connection on client_fd */
 int key = 5432;
 
 /***************************** Function Inits ********************************/
@@ -38,22 +35,24 @@ sharedMemory_t * get_Shared_Memory(int key);
 /********************************* Main Code *********************************/
 int main(int argc, char *argv[])
 {
+	/* Set Up SIGINT (Interrupt Signal or CTRL-C) to execute clean close function */
     signal(SIGINT, closeServer);
     signal(SIGHUP, closeServer);
 	
-    
-	struct sockaddr_in my_addr;	/* my address information */
-	struct sockaddr_in their_addr; /* connector's address information */
-	socklen_t sin_size;
-
-	/* Get port number for server to listen on */
-
+	/* Check Correct Usage */
 	if (argc != 2)
 	{
 		fprintf(stderr, "usage: Server port_number\n");
 		exit(1);
 	}
+
+	/* Get port number for server to listen on */
 	int MYPORT = atoi(argv[1]);
+
+	/* Set up networking */ 
+	struct sockaddr_in my_addr;	/* my address information */
+	struct sockaddr_in their_addr; /* client's address information */
+	socklen_t sin_size;
 
 	/* generate the socket */
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -66,7 +65,6 @@ int main(int argc, char *argv[])
 	my_addr.sin_family = AF_INET;			  /* host byte order */
 	my_addr.sin_port = htons(MYPORT);		  /* short, network byte order */
 	my_addr.sin_addr.s_addr = INADDR_ANY;	 /* auto-fill with my IP */
-	/* bzero(&(my_addr.sin_zero), 8);   ZJL*/ /* zero the rest of the struct */
 
 	/* bind the socket to the end point */
 	if (bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1)
@@ -82,48 +80,63 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	sharedMemory_t * p_channelList =  init_Shared_Memory(key);
 
-	
+	sharedMemory_t * p_channelList =  init_Shared_Memory(key);
 
     printf("<< Started Execution of Chat Server >>\n\n");
 
-	/* repeat: accept, send, close the connection */
-	/* for every accepted connection, use a sepetate process or thread to serve it */
-	while (1)
-	{ /* main accept() loop */
+	/* Main Loop: 	Wait for new connection, setup child process to run new connections
+					Repeat! */
+	while (1){
+		/* Listen for new connection requests (THIS BLOCKS RUNNING FOR PARENT) */
 		sin_size = sizeof(struct sockaddr_in);
-		if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr,
+		if ((client_fd = accept(sockfd, (struct sockaddr *)&their_addr,
 							 &sin_size)) == -1)
 		{
 			perror("accept");
 			continue;
 		}
-		printf("## NEW CONNECTION\n##  Client_id: %d\n##  IP: %s\n", new_fd, inet_ntoa(their_addr.sin_addr));
+
+		/* Print new connection information */
+		printf("## NEW CONNECTION\n##  Client_id: %d\n##  IP: %s\n", client_fd, inet_ntoa(their_addr.sin_addr));
+
+		/* Create Child Process to handle new connection */
 		if (!fork())
-		{ /* this is the child process */
+		{ /* NEW CLIENT HANDLING PROCESS */
+			/* Initialise required vars and get shared memory */
 			int CONNECTED = 1;
 			sharedMemory_t * p_channelList =  get_Shared_Memory(key);
 
+			/* Client Handling Loop 
+					Thread pool may be of use here, to take new requests and handle a queue of
+					requests concurrently*/
+
 			while(CONNECTED){
-				/* Call method to recieve array data - Uncomment this line once function implemented */
-				serv_req_t request = handle_user_reqt(new_fd);
+				serv_req_t request = handle_user_reqt(client_fd);
 				if (request.request_type == BYE){
 					CONNECTED = 0;
 				}
 			}
 
-			printf("<< Connection From %d Closed >>\n", new_fd);
-			close(new_fd);
+			printf("<< Connection From %d Closed >>\n", client_fd);
+			close(client_fd);
 			exit(0);
 		}
 
-		new_fd = 0;
+		client_fd = 0;
 	}
 }
 
 
 /****************************** Function Defs ********************************/
+
+/*
+Func:       Wait for request from client
+			Take this request and perform the relevant action
+Param:      
+            int socket_fd:
+                    The socket to listen on.
+*/
 serv_req_t handle_user_reqt(int socket_fd){
     serv_req_t request;
 
@@ -142,23 +155,27 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 	
 	default:
-		printf("<< Invalid Request Received From %d >>\n", new_fd);
+		response.type = PRINT;
+		strcpy(response.message_text, "SERVER COULD NOT PASS COMMAND");
+		printf("<< Invalid Request Received From %d >>\n", client_fd);
 		break;
 	}
 	sendResponse(response);
     return request;
 }
 
-
+/*
+Func:       Exit program, closing all connections,
+*/
 void closeServer(){
-	switch (new_fd)
+	switch (client_fd)
 	{
 	case 0:
 		printf("\n<< Closing Server-Parent >>\n");
 		break;
 	
 	default:
-		printf("\n<< Closed Connection With id: %d >>\n", new_fd);
+		printf("\n<< Closed Connection With id: %d >>\n", client_fd);
 		serv_resp_t closeClient;
 		closeClient.type = CLOSE;
 		sendResponse(closeClient);
@@ -170,9 +187,14 @@ void closeServer(){
 }
 
 
-
+/*
+Func:       Print a standard representation of a request from the client
+Param:      
+            serv_req_t request:
+                    A struct containing the data sent by the client.
+*/
 void printClientRequest(serv_req_t request){
-	printf("\n## CLIENT REQUEST\n##  Client_id: %d\n", new_fd);
+	printf("\n## CLIENT REQUEST\n##  Client_id: %d\n", client_fd);
 	switch (request.request_type)
 	{
 	case BYE:
@@ -189,9 +211,17 @@ void printClientRequest(serv_req_t request){
 }
 
 
+
+/*
+Func:       Send a response to the client (found at client_fd, which is globally available and unique
+			to this child process).
+Param:      
+            serv_resp_t response:
+                    The response struct to send (May be of type PRINT or CLOSE)
+*/
 void sendResponse(serv_resp_t response) {
 
-    if (send(new_fd, &response, sizeof(serv_resp_t), PF_UNSPEC) == -1){
+    if (send(client_fd, &response, sizeof(serv_resp_t), PF_UNSPEC) == -1){
         perror("Sending request");
     }
 
@@ -199,7 +229,14 @@ void sendResponse(serv_resp_t response) {
 
 
 
-
+/*
+Func:       Initialises the Shared Memory (shm) segment (USED BY PARENT PROCESS)
+			Shared memory is used to store the messages which will be viewed and editted
+			by all child processes.
+Param:      
+            int key:
+                    The identifier for the shm segment
+*/
 sharedMemory_t * init_Shared_Memory(int key){
 	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
 	int id;
@@ -225,6 +262,14 @@ sharedMemory_t * init_Shared_Memory(int key){
 }
 
 
+/*
+Func:       Gets and/or attaches the Shared Memory (shm) segment (USED BY CHILD PROCESSES)
+			Shared memory is used to store the messages which will be viewed and editted
+			by all child processes.
+Param:      
+            int key:
+                    The identifier for the shm segment
+*/
 sharedMemory_t * get_Shared_Memory(int key){
 	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
 	int id;

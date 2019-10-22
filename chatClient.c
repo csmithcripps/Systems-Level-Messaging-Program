@@ -40,6 +40,7 @@ void printHelp();
 /********************************* Main Code *********************************/
 int main(int argc, char* argv[]){
 
+    /* Set up the program to exit gracefully on SIGINT (CTRL-C) */
     signal(SIGINT, exitGracefully);
     signal(SIGHUP, exitGracefully);
 
@@ -124,6 +125,8 @@ void exitGracefully(){
 
 /*
 Func:       Create server requests (serv_req_t) from user inputs
+Return:
+            The request made by the user
 */
 serv_req_t commandHandler(){
         serv_req_t request;
@@ -156,7 +159,7 @@ serv_req_t commandHandler(){
 }
 
 /*
-Func:       Take user string and convert to requestT type code (req_t)
+Func:       Take user string and convert to request type code (req_t)
 Param:
             req[]:
                     User input str
@@ -184,11 +187,10 @@ void printFromRecv(){
 }
 
 /*
-Func: 
-        sendRequest
-Desc:
-        Send request code to Server 
-
+Func:       Send request to the server and wait for responses
+Param:      
+            serv_req_t:
+                    The server request to be sent.
 */
 void sendRequest(serv_req_t request) {
 
@@ -203,11 +205,18 @@ void sendRequest(serv_req_t request) {
     handleResponse(response);
 }
 
+
+/*
+Func:       Take action on responses from the server.
+Param:      
+            serv_resp_t:
+                    details on the server response.
+*/
 void handleResponse(serv_resp_t response){
 	switch (response.type)
 	{
 	case CLOSE:
-        printf("## Close Request from Server");
+        printf("## SERVER --> CLOSE CONNECTION");
         exitGracefully();
 		break;
 	
@@ -218,10 +227,12 @@ void handleResponse(serv_resp_t response){
 	printf("\n");
 }
 
-
+/*
+Func:       Print information on available commands.
+*/
 void printHelp(){
     printf("## AVAILABLE COMMANDS\n");
-    printf("## BYE --> Close connection and exit.");
+    printf("##  BYE --> Close connection and exit.");
     
     printf("\n\n");
 }
