@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/shm.h>
-
+#include <time.h> 
 
 // Definitions Header File
 #include "defs.h"
@@ -21,8 +21,10 @@
 
 #define BACKLOG 10 /* how many pending connections queue will hold */
 int sockfd, client_fd;			   /* listen on sock_fd, new connection on client_fd */
-int key = 5432;
+int key = 1234;
 sharedMemory_t * p_channelList;
+int shm_id;
+int subbed[256] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -161,6 +163,12 @@ serv_req_t handle_user_reqt(int socket_fd){
 		strcpy(response.message_text, "Message Received");
 		break;
 	
+	case SUB:
+		subbed[request.channel_id] = 1;
+		response.type = PRINT;
+		snprintf(response.message_text,1000,"Subbed to channel with id %d", request.channel_id);
+		break;
+
 	default:
 		response.type = PRINT;
 		strcpy(response.message_text, "SERVER COULD NOT PASS COMMAND");
@@ -179,6 +187,7 @@ void closeServer(){
 	{
 	case 0:
 		printf("\n<< Closing Server-Parent >>\n");
+		shmctl(shm_id, IPC_RMID, NULL);
 		break;
 	
 	default:
@@ -206,20 +215,25 @@ void printClientRequest(serv_req_t request){
 	{
 	case BYE:
 		printf("##  Req_Type: BYE\n");
-		printf("##  Action: Close Connection With This Client\n");
+		printf("##    Action: Close Connection With This Client\n");
 		break;
 
 	case SEND:
 		printf("##  Req_Type: SEND\n");
-		printf("##  Channel_id: %d\n", request.channel_id);
-		printf("##  Message: %s\n", request.message_text);
-		printf("##  Action: Store Message Sent into channel\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Message: %s\n", request.message_text);
+		printf("##    Action: Store Message Sent into channel\n");
 		break;
 	
-	
+	case SUB:
+		printf("##  Req_Type: SEND\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Action: Change Subbed[%d] to 1\n", request.channel_id);
+		break;
+		
 	default:
 		printf("##  Req_Type: Unknown\n");
-		printf("##  Action: This Request Code is INVALID or Not Yet Fully Implemented\n");
+		printf("##    Action: This Request Code is INVALID or Not Yet Fully Implemented\n");
 		break;
 	}
 	printf("\n");
@@ -254,20 +268,19 @@ Param:
 */
 sharedMemory_t * init_Shared_Memory(int key){
 	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
-	int id;
 
 	for (int i=0; i<255; i++){
 		p_ChannelList->channels[i].numMsgs = 0;
 	}
 
-	if ((id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0666)) < 0)
+	if ((shm_id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0666)) < 0)
     {
         perror("SHMGET");
         exit(1);
     }
 
 
-    if((p_ChannelList = shmat(id, 0, 0)) == (sharedMemory_t *) -1)
+    if((p_ChannelList = shmat(shm_id, 0, 0)) == (sharedMemory_t *) -1)
     {
         perror("SHMAT");
         exit(1);
@@ -287,10 +300,9 @@ Param:
 */
 sharedMemory_t * get_Shared_Memory(int key){
 	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
-	int id;
 
-	id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0644);
-    p_ChannelList = shmat(id, 0, 0);
+	shm_id = shmget(key,sizeof(sharedMemory_t), IPC_CREAT | 0644);
+    p_ChannelList = shmat(shm_id, 0, 0);
 
 	return p_ChannelList;
 }
@@ -300,7 +312,8 @@ void storeMessage(serv_req_t request){
 	newMsg.channel_id = request.channel_id;
 	newMsg.client_id = client_fd;
 	strcpy(newMsg.message_text, request.message_text);
-	p_channelList->channels->messages[p_channelList->channels->numMsgs] = newMsg;
-	p_channelList->channels->numMsgs += 1;
+	p_channelList->channels[request.channel_id].messages[p_channelList->channels[request.channel_id].numMsgs] = newMsg;
+	p_channelList->channels[request.channel_id].numMsgs += 1;
+	p_channelList->channels[request.channel_id].lastEdited = time(NULL);
 	
 }

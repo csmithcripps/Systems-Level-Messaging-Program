@@ -151,6 +151,11 @@ serv_req_t commandHandler(){
             scanf("%[^\n]s",request.message_text);
             sendRequest(request);
             break;
+
+        case SUB:
+            scanf("%d",&request.channel_id);
+            sendRequest(request);
+            break;
         
         case INVALID:
             printf("\n<< INVALID INPUT >>\n");
@@ -183,6 +188,9 @@ req_t checkRequestType(char req[]){
     }
     else if (strcmp(req, "SEND")==0){
         request_Type = SEND;
+    }
+    else if (strcmp(req, "SUB")==0){
+        request_Type = SUB;
     }
     else{
         request_Type = INVALID;

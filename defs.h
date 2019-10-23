@@ -1,6 +1,8 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
+#include <time.h> 
+
 
 /* Requests from client */
 typedef enum {
@@ -9,6 +11,7 @@ typedef enum {
     CHANNELS,
     UNSUB,
     NEXT,
+    NEXT_CHANNEL,
     LIVEFEED,
     LIVEFEED_CHANNEL,
     SEND,
@@ -46,6 +49,7 @@ typedef struct msg{
 
 typedef struct channel{
     int channel_id;
+    time_t lastEdited;
     long int numMsgs;
     msg_t messages[1000];
 } channel_t;
