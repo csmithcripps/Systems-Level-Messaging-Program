@@ -22,6 +22,7 @@
 #define BACKLOG 10 /* how many pending connections queue will hold */
 int sockfd, client_fd;			   /* listen on sock_fd, new connection on client_fd */
 int key = 5432;
+sharedMemory_t * p_channelList;
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -30,7 +31,7 @@ void printClientRequest(serv_req_t request);
 void sendResponse(serv_resp_t response);
 sharedMemory_t * init_Shared_Memory(int key);
 sharedMemory_t * get_Shared_Memory(int key);
-
+void storeMessage(serv_req_t request);
 
 /********************************* Main Code *********************************/
 int main(int argc, char *argv[])
@@ -81,7 +82,7 @@ int main(int argc, char *argv[])
 	}
 
 
-	sharedMemory_t * p_channelList =  init_Shared_Memory(key);
+	p_channelList =  init_Shared_Memory(key);
 
     printf("<< Started Execution of Chat Server >>\n\n");
 
@@ -105,7 +106,7 @@ int main(int argc, char *argv[])
 		{ /* NEW CLIENT HANDLING PROCESS */
 			/* Initialise required vars and get shared memory */
 			int CONNECTED = 1;
-			sharedMemory_t * p_channelList =  get_Shared_Memory(key);
+			p_channelList =  get_Shared_Memory(key);
 
 			/* Client Handling Loop 
 					Thread pool may be of use here, to take new requests and handle a queue of
@@ -152,6 +153,12 @@ serv_req_t handle_user_reqt(int socket_fd){
 	case BYE:
 		response.type = PRINT;
 		strcpy(response.message_text, "Server Connection Closed");
+		break;
+	
+	case SEND:
+		storeMessage(request);
+		response.type = PRINT;
+		strcpy(response.message_text, "Message Received");
 		break;
 	
 	default:
@@ -201,6 +208,14 @@ void printClientRequest(serv_req_t request){
 		printf("##  Req_Type: BYE\n");
 		printf("##  Action: Close Connection With This Client\n");
 		break;
+
+	case SEND:
+		printf("##  Req_Type: SEND\n");
+		printf("##  Channel_id: %d\n", request.channel_id);
+		printf("##  Message: %s\n", request.message_text);
+		printf("##  Action: Store Message Sent into channel\n");
+		break;
+	
 	
 	default:
 		printf("##  Req_Type: Unknown\n");
@@ -278,4 +293,14 @@ sharedMemory_t * get_Shared_Memory(int key){
     p_ChannelList = shmat(id, 0, 0);
 
 	return p_ChannelList;
+}
+
+void storeMessage(serv_req_t request){
+	msg_t newMsg;
+	newMsg.channel_id = request.channel_id;
+	newMsg.client_id = client_fd;
+	strcpy(newMsg.message_text, request.message_text);
+	p_channelList->channels->messages[p_channelList->channels->numMsgs] = newMsg;
+	p_channelList->channels->numMsgs += 1;
+	
 }
