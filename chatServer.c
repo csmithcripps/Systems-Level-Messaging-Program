@@ -226,9 +226,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 			numRead[request.channel_id] = numRead[request.channel_id] ++;
 		}
 
-    
-        
-   break;
+		break;
 
 	default:
 		response.type = PRINT;
