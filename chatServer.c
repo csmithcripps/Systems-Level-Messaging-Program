@@ -25,6 +25,7 @@ sharedMemory_t * p_channelList;
 int shm_id;
 int subbed[256] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
 int numRead[256] = {0}; // Add 1 if message is opened 
+int msgWhenSubbed[256] = {0}; // Set to numRead when client subscribes
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -191,10 +192,44 @@ serv_req_t handle_user_reqt(int socket_fd){
 		}
         else {
             subbed[request.channel_id] = 1;
+			msgWhenSubbed[request.channel_id] = p_channelList->channels[request.channel_id].numMsgs;
             response.type = PRINT;
             snprintf(response.message_text, 1000, "Subscribed to channel %d.", request.channel_id);
 		}
 		break;
+
+	/*************************This may be very broken*************************************/
+	case NEXT:
+    //If channel doesnt exist print message
+    if ( request.channel_id < 0 || request.channel_id > 256 )
+    {
+        response.type = PRINT;
+        snprintf( response.message_text, 1000, “ Invalid channel: %d.”, request.channel_id );
+    }
+
+    //If client not subscribbed print message
+    else if ( subbed[request.channel_id] = 0 )
+    {
+        response.type = PRINT;
+        snprintf( response.message_text, 1000, “ Not subscribed to channel %d.”, request.channel_id );
+    }
+
+    //Else retrive first message available from time client joined and display 
+    else 
+    {
+        int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
+        channel_t tempchannel = p_channel -> channel[request.channel_id];
+        msg_t tempmessage = tempcahnnel.messages[currentmessage];
+
+        response.type = PRINT;
+        snprintf( response.message_text, 1000, “ %s. ”, tempmessage.message_text );
+
+        numRead[request.channel_id] = numRead[request.channel_id] ++;
+    }
+
+    
+        
+   break;
 
 	default:
 		response.type = PRINT;
