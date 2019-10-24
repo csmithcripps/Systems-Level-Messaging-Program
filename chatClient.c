@@ -183,8 +183,20 @@ req_t checkRequestType(char req[]){
     if (strcmp(req, "BYE")==0){  
         request_Type = BYE;
     }
+    else if (strcmp(req, "CHANNELS")==0){
+        request_Type = CHANNELS;
+    }
     else if (strcmp(req, "HELP")==0){
         request_Type = HELP;
+    }
+    else if (strcmp(req, "NEXT")==0){
+        request_Type = NEXT;
+    }
+    else if (strcmp(req, "UNSUB")==0){
+        request_Type = UNSUB;
+    }
+    else if (strcmp(req, "LIVEFEED")==0){
+        request_Type = LIVEFEED;
     }
     else if (strcmp(req, "SEND")==0){
         request_Type = SEND;
