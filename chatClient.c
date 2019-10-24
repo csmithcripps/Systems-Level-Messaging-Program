@@ -324,15 +324,12 @@ serv_req_t handle_next(){
         request.request_type = INVALID;
         return request;
     }
-
     // have some input, convert it to integer:
     char *endptr;
-
     errno = 0; // reset error number
     temp = strtol(request.message_text, &endptr, 10);
     if (errno == ERANGE)
     {
-        printf("Sorry, this number is too small or too large.\n");
         num = 0;
     }
     else if (endptr == request.message_text)
