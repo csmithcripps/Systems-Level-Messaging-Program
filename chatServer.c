@@ -16,7 +16,6 @@
 // Definitions Header File
 #include "defs.h"
 
-
 /**************************** Global Constants *******************************/
 
 #define BACKLOG 10 /* how many pending connections queue will hold */
@@ -25,6 +24,7 @@ int key = 1234;
 sharedMemory_t * p_channelList;
 int shm_id;
 int subbed[256] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
+int numRead[256] = {0}; // Add 1 if message is opened 
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -152,6 +152,32 @@ serv_req_t handle_user_reqt(int socket_fd){
 	
 	switch (request.request_type)
 	{
+	case UNSUB:
+
+        if ( request.channel_id < 0 || request.channel_id > 255 )
+        {
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Invalid channel: %d.”, request.channel_id);
+        }
+            
+        
+        else if ( subbed[request.channel_id] = 0 )
+        {
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Not subscribed to channel %d.”, request.channel_id);
+        }
+            
+        
+        else 
+        {
+            subbed[request.channel_id] = 0;
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Unsubscribed from channel %d.”, request.channel_id);
+        }
+            
+
+        break;
+
 	case BYE:
 		response.type = PRINT;
 		strcpy(response.message_text, "Server Connection Closed");
@@ -164,9 +190,20 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 	
 	case SUB:
-		subbed[request.channel_id] = 1;
-		response.type = PRINT;
-		snprintf(response.message_text,1000,"Subbed to channel with id %d", request.channel_id);
+
+        if ( request. channel_id < 0 || request.channel_id > 255 )
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Invalid channel: %d.”, request.channel_id);
+
+        else if ( subbed[request.channel_id] = 0 )
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Already subscribed to channel  %d.”, request.channel_id);
+        
+        else 
+            subbed[request.channel_id] = 1;
+            response.type = PRINT;
+            snprintf(response.message_text, 1000, “Subscribed to channel %d.”, request.channel_id);
+
 		break;
 
 	default:
