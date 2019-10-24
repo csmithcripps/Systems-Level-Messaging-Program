@@ -11,6 +11,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <ctype.h>
 
 
 // Definitions Header File
@@ -35,6 +36,7 @@ void printFromRecv();
 req_t checkRequestType(char req[]);
 void handleResponse(serv_resp_t response);
 void printHelp();
+serv_req_t handle_next();
 
 
 /********************************* Main Code *********************************/
@@ -130,7 +132,6 @@ Return:
 */
 serv_req_t commandHandler(){
         serv_req_t request;
-        int temp;
         char req[50];
         printf("\n --> ");
         scanf("%s", req);
@@ -159,13 +160,7 @@ serv_req_t commandHandler(){
             break;
 
         case NEXT:
-            if(scanf("%d",&temp)!=EOF){
-                request.request_type = NEXT_CHANNEL;
-                request.channel_id = temp;
-            }
-            else{
-                request.request_type = NEXT;
-            }
+            request = handle_next();
             sendRequest(request);
             break;
 
@@ -315,4 +310,52 @@ void printHelp(){
     printf("\n##  BYE\n        --> Close connection and exit.");
     
     printf("\n\n");
+}
+
+
+serv_req_t handle_next(){
+
+    int num = 1;
+    int temp;
+    serv_req_t request;
+    if (!fgets(request.message_text, 1024, stdin))
+    {
+        // reading input failed:
+        request.request_type = INVALID;
+        return request;
+    }
+
+    // have some input, convert it to integer:
+    char *endptr;
+
+    errno = 0; // reset error number
+    temp = strtol(request.message_text, &endptr, 10);
+    if (errno == ERANGE)
+    {
+        printf("Sorry, this number is too small or too large.\n");
+        num = 0;
+    }
+    else if (endptr == request.message_text)
+    {
+        // no character was read
+        num = 0;
+    }
+    else if (*endptr && *endptr != '\n')
+    {
+        // *endptr is neither end of string nor newline,
+        // so we didn't convert the *whole* input
+        num = 0;
+    }
+    else
+    {
+        num = 1;
+    }
+    if(num == 1){
+        request.request_type = NEXT_CHANNEL;
+        request.channel_id = temp;
+    }
+    else{
+        request.request_type = NEXT;
+    }
+    return request;
 }

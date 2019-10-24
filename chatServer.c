@@ -227,9 +227,9 @@ void closeServer(){
 	
 	default:
 		printf("\n<< Closed Connection With id: %d >>\n", client_fd);
-		serv_resp_t closeClient;
-		closeClient.type = CLOSE;
-		sendResponse(closeClient);
+		
+		shutdown(client_fd, SHUT_RDWR);
+		close(client_fd);
 		break;
 	}
     shutdown(sockfd, SHUT_RDWR);
