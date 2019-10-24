@@ -35,7 +35,7 @@ void sendResponse(serv_resp_t response);
 sharedMemory_t * init_Shared_Memory(int key);
 sharedMemory_t * get_Shared_Memory(int key);
 void storeMessage(serv_req_t request);
-serv_resp_t handleNEXT_CHANNEL(serv_req_t request);
+serv_resp_t handle_next_channel(serv_req_t request);
 
 /********************************* Main Code *********************************/
 int main(int argc, char *argv[])
@@ -200,7 +200,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 
 	case NEXT_CHANNEL:
-		response = handleNEXT_CHANNEL(request);
+		response = handle_next_channel(request);
 
 		break;
 
@@ -356,7 +356,7 @@ void storeMessage(serv_req_t request){
 }
 
 
-serv_resp_t handleNEXT_CHANNEL(serv_req_t request){
+serv_resp_t handle_next_channel(serv_req_t request){
 	serv_resp_t response;
 	//If channel doesnt exist print message
 	if ( request.channel_id < 0 || request.channel_id > 256 )
