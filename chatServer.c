@@ -198,8 +198,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 		}
 		break;
 
-	/*************************This may be very broken*************************************/
-	case NEXT:
+	case NEXT_CHANNEL:
 		//If channel doesnt exist print message
 		if ( request.channel_id < 0 || request.channel_id > 256 )
 		{
