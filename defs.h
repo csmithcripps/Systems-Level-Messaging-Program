@@ -29,6 +29,7 @@ typedef struct {
 /* Responses from server */
 typedef enum {
     PRINT,
+    END,
     CLOSE
 } resp_t;
 

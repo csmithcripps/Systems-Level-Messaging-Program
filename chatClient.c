@@ -143,20 +143,30 @@ serv_req_t commandHandler(){
             printHelp();
             break;
 
-        case BYE:
-            exitGracefully();
+        case SUB:
+            scanf("%d",&request.channel_id);
+            sendRequest(request);
+            break;
+
+        case UNSUB:
+            scanf("%d",&request.channel_id);
+            sendRequest(request);
+            break;
+        
+        case CHANNELS:
+            sendRequest(request);
+            printFromRecv();
+            break;
 
         case SEND:
             scanf("%d",&request.channel_id);
             scanf("%[^\n]s",request.message_text);
             sendRequest(request);
             break;
-
-        case SUB:
-            scanf("%d",&request.channel_id);
-            sendRequest(request);
-            break;
         
+        case BYE:
+            exitGracefully();
+
         case INVALID:
             printf("\n<< INVALID INPUT >>\n");
             break;
@@ -212,7 +222,28 @@ req_t checkRequestType(char req[]){
 
 
 void printFromRecv(){
+    int PRINTING = 1;
+    serv_resp_t response;
+    while(PRINTING){
+        if (recv(socket_fd, &response, sizeof(serv_resp_t), PF_UNSPEC) == -1){
+            perror("Receiving response");
+        }
+        switch (response.type)
+        {
+        case END:
+            PRINTING = 0;
+            break;
+        
+        case CLOSE:
+            printf("## SERVER --> CLOSE CONNECTION");
+            exitGracefully();
+            break;
 
+        default:
+            printf("\n%s\n", response.message_text);
+            break;
+        }
+    }
 }
 
 /*
@@ -260,8 +291,16 @@ void handleResponse(serv_resp_t response){
 Func:       Print information on available commands.
 */
 void printHelp(){
-    printf("## AVAILABLE COMMANDS\n");
-    printf("##  BYE --> Close connection and exit.");
+    printf("\n## AVAILABLE COMMANDS");
+    printf("\n##  SUB <channel_id>        --> Subscribe to channel[channel_id].");
+    printf("\n##  CHANNELS                --> List stats on all subscribed channels.");
+    printf("\n##  UNSUB <channel_id>      --> Unsubscribe to channel[channel_id].");
+    printf("\n##  NEXT <channel_id>       --> Show next unread message on channel[channel_id]");
+    printf("\n##                              --> If no channel_id is input, show next unread message from any subbed channel");
+    printf("\n##  LIVEFEED <channel_id>   --> Display all unread messages on channel[channel_id], then display new messages as they come");
+    printf("\n##                              --> If no channel_id is input, all subbed channels are displayed");
+    printf("\n##  SEND                    --> Close connection and exit.");
+    printf("\n##  BYE                     --> Close connection and exit.");
     
     printf("\n\n");
 }
