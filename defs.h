@@ -40,7 +40,6 @@ typedef struct {
 } serv_resp_t;
 
 
-
 /* Channel Shared Memory */
 typedef struct msg{
     int channel_id;

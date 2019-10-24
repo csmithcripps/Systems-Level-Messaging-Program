@@ -292,15 +292,15 @@ Func:       Print information on available commands.
 */
 void printHelp(){
     printf("\n## AVAILABLE COMMANDS");
-    printf("\n##  SUB <channel_id>        --> Subscribe to channel[channel_id].");
-    printf("\n##  CHANNELS                --> List stats on all subscribed channels.");
-    printf("\n##  UNSUB <channel_id>      --> Unsubscribe to channel[channel_id].");
-    printf("\n##  NEXT <channel_id>       --> Show next unread message on channel[channel_id]");
-    printf("\n##                              --> If no channel_id is input, show next unread message from any subbed channel");
-    printf("\n##  LIVEFEED <channel_id>   --> Display all unread messages on channel[channel_id], then display new messages as they come");
-    printf("\n##                              --> If no channel_id is input, all subbed channels are displayed");
-    printf("\n##  SEND                    --> Close connection and exit.");
-    printf("\n##  BYE                     --> Close connection and exit.");
+    printf("\n##  SUB <channel_id>\n        --> Subscribe to channel[channel_id].");
+    printf("\n##  CHANNELS\n        --> List stats on all subscribed channels.");
+    printf("\n##  UNSUB <channel_id>\n        --> Unsubscribe to channel[channel_id].");
+    printf("\n##  NEXT <channel_id>\n        --> Show next unread message on channel[channel_id]");
+    printf("\n          --> If no channel_id is input, show next unread message from any subbed channel");
+    printf("\n##  LIVEFEED <channel_id>\n        --> Display all unread messages on channel[channel_id], then display new messages as they come");
+    printf("\n          --> If no channel_id is input, all subbed channels are displayed");
+    printf("\n##  SEND\n        --> Close connection and exit.");
+    printf("\n##  BYE\n        --> Close connection and exit.");
     
     printf("\n\n");
 }

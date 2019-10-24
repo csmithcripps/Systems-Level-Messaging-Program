@@ -153,30 +153,20 @@ serv_req_t handle_user_reqt(int socket_fd){
 	switch (request.request_type)
 	{
 	case UNSUB:
-
-        if ( request.channel_id < 0 || request.channel_id > 255 )
-        {
+        if ( request.channel_id < 0 || request.channel_id > 255 ){
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Invalid channel: %d.”, request.channel_id);
-        }
-            
-        
-        else if ( subbed[request.channel_id] = 0 )
-        {
+            snprintf(response.message_text, 1000, "Invalid channel: %d.", request.channel_id);
+        }      
+        else if ( subbed[request.channel_id] == 0 ){
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Not subscribed to channel %d.”, request.channel_id);
+            snprintf(response.message_text, 1000, "Not subscribed to channel %d.", request.channel_id);
         }
-            
-        
-        else 
-        {
+        else{
             subbed[request.channel_id] = 0;
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Unsubscribed from channel %d.”, request.channel_id);
+            snprintf(response.message_text, 1000, "Unsubscribed from channel %d.", request.channel_id);
         }
-            
-
-        break;
+		break;
 
 	case BYE:
 		response.type = PRINT;
@@ -191,19 +181,19 @@ serv_req_t handle_user_reqt(int socket_fd){
 	
 	case SUB:
 
-        if ( request. channel_id < 0 || request.channel_id > 255 )
+        if ( request. channel_id < 0 || request.channel_id > 255 ){
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Invalid channel: %d.”, request.channel_id);
-
-        else if ( subbed[request.channel_id] = 0 )
+            snprintf(response.message_text, 1000, "Invalid channel: %d.", request.channel_id);
+		}
+        else if ( subbed[request.channel_id] == 1 ){
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Already subscribed to channel  %d.”, request.channel_id);
-        
-        else 
+            snprintf(response.message_text, 1000, "Already subscribed to channel  %d.", request.channel_id);
+		}
+        else {
             subbed[request.channel_id] = 1;
             response.type = PRINT;
-            snprintf(response.message_text, 1000, “Subscribed to channel %d.”, request.channel_id);
-
+            snprintf(response.message_text, 1000, "Subscribed to channel %d.", request.channel_id);
+		}
 		break;
 
 	default:
