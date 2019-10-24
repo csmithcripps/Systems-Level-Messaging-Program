@@ -200,32 +200,32 @@ serv_req_t handle_user_reqt(int socket_fd){
 
 	/*************************This may be very broken*************************************/
 	case NEXT:
-    //If channel doesnt exist print message
-    if ( request.channel_id < 0 || request.channel_id > 256 )
-    {
-        response.type = PRINT;
-        snprintf( response.message_text, 1000, “ Invalid channel: %d.”, request.channel_id );
-    }
+		//If channel doesnt exist print message
+		if ( request.channel_id < 0 || request.channel_id > 256 )
+		{
+			response.type = PRINT;
+			snprintf( response.message_text, 1000, "Invalid channel: %d.", request.channel_id );
+		}
 
-    //If client not subscribbed print message
-    else if ( subbed[request.channel_id] = 0 )
-    {
-        response.type = PRINT;
-        snprintf( response.message_text, 1000, “ Not subscribed to channel %d.”, request.channel_id );
-    }
+		//If client not subscribbed print message
+		else if ( subbed[request.channel_id] == 0 )
+		{
+			response.type = PRINT;
+			snprintf( response.message_text, 1000, "Not subscribed to channel %d.", request.channel_id );
+		}
 
-    //Else retrive first message available from time client joined and display 
-    else 
-    {
-        int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
-        channel_t tempchannel = p_channel -> channel[request.channel_id];
-        msg_t tempmessage = tempcahnnel.messages[currentmessage];
+		//Else retrive first message available from time client joined and display 
+		else 
+		{
+			int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
+			channel_t tempchannel = p_channelList -> channels[request.channel_id];
+			msg_t tempmessage = tempchannel.messages[currentmessage];
 
-        response.type = PRINT;
-        snprintf( response.message_text, 1000, “ %s. ”, tempmessage.message_text );
+			response.type = PRINT;
+			snprintf( response.message_text, 1024, " %s ", tempmessage.message_text );
 
-        numRead[request.channel_id] = numRead[request.channel_id] ++;
-    }
+			numRead[request.channel_id] = numRead[request.channel_id] ++;
+		}
 
     
         

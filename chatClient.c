@@ -158,6 +158,11 @@ serv_req_t commandHandler(){
             printFromRecv();
             break;
 
+        case NEXT:
+            scanf("%d",&request.channel_id);
+            sendRequest(request);
+            break;
+
         case SEND:
             scanf("%d",&request.channel_id);
             scanf("%[^\n]s",request.message_text);
@@ -166,6 +171,7 @@ serv_req_t commandHandler(){
         
         case BYE:
             exitGracefully();
+            break;
 
         case INVALID:
             printf("\n<< INVALID INPUT >>\n");
