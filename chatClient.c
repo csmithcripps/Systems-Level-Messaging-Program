@@ -130,7 +130,7 @@ Return:
 */
 serv_req_t commandHandler(){
         serv_req_t request;
-
+        int temp;
         char req[50];
         printf("\n --> ");
         scanf("%s", req);
@@ -159,7 +159,13 @@ serv_req_t commandHandler(){
             break;
 
         case NEXT:
-            scanf("%d",&request.channel_id);
+            if(scanf("%d",&temp)!=EOF){
+                request.request_type = NEXT_CHANNEL;
+                request.channel_id = temp;
+            }
+            else{
+                request.request_type = NEXT;
+            }
             sendRequest(request);
             break;
 

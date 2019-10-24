@@ -223,7 +223,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 			response.type = PRINT;
 			snprintf( response.message_text, 1024, " %s ", tempmessage.message_text );
 
-			numRead[request.channel_id] = numRead[request.channel_id] ++;
+			numRead[request.channel_id]++;
 		}
 
 		break;
@@ -292,6 +292,8 @@ void printClientRequest(serv_req_t request){
 		
 	default:
 		printf("##  Req_Type: Unknown\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Message: %s\n", request.message_text);
 		printf("##    Action: This Request Code is INVALID or Not Yet Fully Implemented\n");
 		break;
 	}
