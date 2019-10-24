@@ -35,6 +35,7 @@ void sendResponse(serv_resp_t response);
 sharedMemory_t * init_Shared_Memory(int key);
 sharedMemory_t * get_Shared_Memory(int key);
 void storeMessage(serv_req_t request);
+serv_resp_t handleNEXT_CHANNEL(serv_req_t request);
 
 /********************************* Main Code *********************************/
 int main(int argc, char *argv[])
@@ -199,32 +200,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 
 	case NEXT_CHANNEL:
-		//If channel doesnt exist print message
-		if ( request.channel_id < 0 || request.channel_id > 256 )
-		{
-			response.type = PRINT;
-			snprintf( response.message_text, 1000, "Invalid channel: %d.", request.channel_id );
-		}
-
-		//If client not subscribbed print message
-		else if ( subbed[request.channel_id] == 0 )
-		{
-			response.type = PRINT;
-			snprintf( response.message_text, 1000, "Not subscribed to channel %d.", request.channel_id );
-		}
-
-		//Else retrive first message available from time client joined and display 
-		else 
-		{
-			int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
-			channel_t tempchannel = p_channelList -> channels[request.channel_id];
-			msg_t tempmessage = tempchannel.messages[currentmessage];
-
-			response.type = PRINT;
-			snprintf( response.message_text, 1024, " %s ", tempmessage.message_text );
-
-			numRead[request.channel_id]++;
-		}
+		response = handleNEXT_CHANNEL(request);
 
 		break;
 
@@ -377,4 +353,36 @@ void storeMessage(serv_req_t request){
 	p_channelList->channels[request.channel_id].numMsgs += 1;
 	p_channelList->channels[request.channel_id].lastEdited = time(NULL);
 	
+}
+
+
+serv_resp_t handleNEXT_CHANNEL(serv_req_t request){
+	serv_resp_t response;
+	//If channel doesnt exist print message
+	if ( request.channel_id < 0 || request.channel_id > 256 )
+	{
+		response.type = PRINT;
+		snprintf( response.message_text, 1000, "Invalid channel: %d.", request.channel_id );
+	}
+
+	//If client not subscribbed print message
+	else if ( subbed[request.channel_id] == 0 )
+	{
+		response.type = PRINT;
+		snprintf( response.message_text, 1000, "Not subscribed to channel %d.", request.channel_id );
+	}
+
+	//Else retrive first message available from time client joined and display 
+	else 
+	{
+		int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
+		channel_t tempchannel = p_channelList -> channels[request.channel_id];
+		msg_t tempmessage = tempchannel.messages[currentmessage];
+
+		response.type = PRINT;
+		snprintf( response.message_text, 1024, " %s ", tempmessage.message_text );
+
+		numRead[request.channel_id]++;
+	}
+	return response;
 }
