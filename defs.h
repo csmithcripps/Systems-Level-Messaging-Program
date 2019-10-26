@@ -1,7 +1,11 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#include <time.h> 
+#include <time.h>
+#include <pthread.h>
+
+#define NUM_CHANNELS 256
+
 
 
 /* Requests from client */
@@ -55,7 +59,10 @@ typedef struct channel{
 } channel_t;
 
 typedef struct SharedMemoryType{
-    channel_t channels[256];
+    channel_t channels[NUM_CHANNELS];
+    int channel_readers[NUM_CHANNELS];
+    int channel_writer_locks[NUM_CHANNELS];
+    int readerCnt[NUM_CHANNELS]; 
 } sharedMemory_t;
 
 

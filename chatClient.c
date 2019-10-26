@@ -356,3 +356,6 @@ serv_req_t handle_next(){
     }
     return request;
 }
+
+
+int ifChannel();

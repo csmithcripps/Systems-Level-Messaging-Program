@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -23,9 +24,9 @@ int sockfd, client_fd;			   /* listen on sock_fd, new connection on client_fd */
 int key = 1234;
 sharedMemory_t * p_channelList;
 int shm_id;
-int subbed[256] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
-int numRead[256] = {0}; // Add 1 if message is opened 
-int msgWhenSubbed[256] = {0}; // Set to numRead when client subscribes
+int subbed[NUM_CHANNELS] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
+int numRead[NUM_CHANNELS] = {0}; // Add 1 if message is opened 
+int msgWhenSubbed[NUM_CHANNELS] = {0}; // Set to numRead when client subscribes
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -36,6 +37,10 @@ sharedMemory_t * init_Shared_Memory(int key);
 sharedMemory_t * get_Shared_Memory(int key);
 void storeMessage(serv_req_t request);
 serv_resp_t handle_next_channel(serv_req_t request);
+serv_resp_t handle_next(serv_req_t request);
+void start_reader(int channel_id);
+void rmv_reader(int channel_id);
+
 
 /********************************* Main Code *********************************/
 int main(int argc, char *argv[])
@@ -85,8 +90,18 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-
+	// Init shared memory
 	p_channelList =  init_Shared_Memory(key);
+
+	// Init Variables for critical section solution
+	for(int i=0;i<NUM_CHANNELS;i++){   
+		if (sem_init(&(p_channelList->channel_readers[i]), 1, 0) ==-1 ||
+			sem_init(&(p_channelList->channel_writer_locks[i]), 1, 0) ==-1 ){
+            perror("sem_init");
+            exit(EXIT_FAILURE);
+        }
+		p_channelList->readerCnt[i] = 0;
+    }
 
     printf("<< Started Execution of Chat Server >>\n\n");
 
@@ -144,11 +159,14 @@ Param:
 */
 serv_req_t handle_user_reqt(int socket_fd){
     serv_req_t request;
-
+	
     if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
         perror("Receiving user coord request");
     }
 	printClientRequest(request);
+
+	// if Reader: Signal Semaphore to start reader
+	if (request.request_type != SEND) start_reader(request.channel_id);
 
 	serv_resp_t response;
 	
@@ -182,7 +200,6 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 	
 	case SUB:
-
         if ( request. channel_id < 0 || request.channel_id > 255 ){
             response.type = PRINT;
             snprintf(response.message_text, 1000, "Invalid channel: %d.", request.channel_id);
@@ -201,7 +218,17 @@ serv_req_t handle_user_reqt(int socket_fd){
 
 	case NEXT_CHANNEL:
 		response = handle_next_channel(request);
+		break;
 
+	case NEXT:
+		response.type = PRINT;
+		int numSubbed = 0;
+		for (int i = 0; i < NUM_CHANNELS; i++) numSubbed += subbed[i];
+		if (!numSubbed){
+			strcpy(response.message_text, "No Channels Subbed");
+		}else{
+			response = handle_next(request);		
+		}
 		break;
 
 	default:
@@ -211,6 +238,8 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 	}
 	sendResponse(response);
+	// if Reader: Signal Semaphore to remove reader
+	if (request.request_type != SEND) rmv_reader(request.channel_id);
     return request;
 }
 
@@ -261,16 +290,44 @@ void printClientRequest(serv_req_t request){
 		break;
 	
 	case SUB:
-		printf("##  Req_Type: SEND\n");
+		printf("##  Req_Type: SUB\n");
 		printf("##    Channel_id: %d\n", request.channel_id);
 		printf("##    Action: Change Subbed[%d] to 1\n", request.channel_id);
 		break;
 		
+	case UNSUB:
+		printf("##  Req_Type: UNSUB\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Action: Change Subbed[%d] to 0\n", request.channel_id);
+		break;
+			
+	case NEXT_CHANNEL:
+		printf("##  Req_Type: NEXT_CHANNEL\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Action: Send next unread message from channel %d\n", request.channel_id);
+		break;
+		
+	case NEXT:
+		printf("##  Req_Type: NEXT\n");
+		printf("##    Action: Send next unread message on subbed channels\n");
+		break;
+		
+	case LIVEFEED_CHANNEL:
+		printf("##  Req_Type: LIVEFEED_CHANNEL\n");
+		printf("##    Channel_id: %d\n", request.channel_id);
+		printf("##    Action: Start sending all unread and new messages on channel %d\n", request.channel_id);
+		break;
+		
+	case LIVEFEED:
+		printf("##  Req_Type: LIVEFEED\n");
+		printf("##    Action: Start sending all unread and new messages on subbed channels\n");
+		break;
+								
 	default:
 		printf("##  Req_Type: Unknown\n");
 		printf("##    Channel_id: %d\n", request.channel_id);
 		printf("##    Message: %s\n", request.message_text);
-		printf("##    Action: This Request Code is INVALID or Not Yet Fully Implemented\n");
+		printf("##    Action: No description written for this request type\n");
 		break;
 	}
 	printf("\n");
@@ -349,17 +406,27 @@ void storeMessage(serv_req_t request){
 	newMsg.channel_id = request.channel_id;
 	newMsg.client_id = client_fd;
 	strcpy(newMsg.message_text, request.message_text);
+
+	if (pthread_mutex_lock(&(p_channelList->channel_locks[request.channel_id]))) {
+		perror("pthread_mutex_lock");
+		closeServer();
+	}
+
 	p_channelList->channels[request.channel_id].messages[p_channelList->channels[request.channel_id].numMsgs] = newMsg;
 	p_channelList->channels[request.channel_id].numMsgs += 1;
 	p_channelList->channels[request.channel_id].lastEdited = time(NULL);
 	
+	if (pthread_mutex_unlock(&(p_channelList->channel_locks[request.channel_id]))) {
+		perror("pthread_mutex_unlock");
+		closeServer();
+	}
 }
 
 
 serv_resp_t handle_next_channel(serv_req_t request){
 	serv_resp_t response;
 	//If channel doesnt exist print message
-	if ( request.channel_id < 0 || request.channel_id > 256 )
+	if ( request.channel_id < 0 || request.channel_id > NUM_CHANNELS )
 	{
 		response.type = PRINT;
 		snprintf( response.message_text, 1000, "Invalid channel: %d.", request.channel_id );
@@ -380,9 +447,54 @@ serv_resp_t handle_next_channel(serv_req_t request){
 		msg_t tempmessage = tempchannel.messages[currentmessage];
 
 		response.type = PRINT;
-		snprintf( response.message_text, 1024, " %s ", tempmessage.message_text );
+		snprintf( response.message_text, 1024, "%s", tempmessage.message_text );
 
 		numRead[request.channel_id]++;
 	}
 	return response;
+}
+
+// serv_resp_t handle_next(serv_req_t request){
+// 	serv_resp_t response;
+	
+
+
+
+// 	int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
+// 	channel_t tempchannel = p_channelList -> channels[request.channel_id];
+// 	msg_t tempmessage = tempchannel.messages[currentmessage];
+
+// 	response.type = PRINT;
+// 	snprintf( response.message_text, 1024, "%s", tempmessage.message_text );
+
+// 	numRead[request.channel_id]++;
+// 	return response;
+// }
+
+void start_reader(int channel_id){    
+   // Reader wants to enter the critical section
+   wait(p_channelList->channel_readers[channel_id]);
+
+   // Increase Reader count for channel_id
+   p_channelList->readerCnt[channel_id]++;                   
+
+   // ensure that no writers can enter this critical section
+   // when at least 1 reader is reading 
+   if (p_channelList->readerCnt[channel_id]==1)     
+      wait(p_channelList->channel_writer_locks[channel_id]);                    
+
+   // Allow multiple readers to enter the critical section
+   signal(p_channelList->channel_readers[channel_id]);          
+}
+
+void rmv_reader(int channel_id){
+	wait(p_channelList->channel_readers[channel_id]);// a reader wants to leave
+
+	p_channelList->readerCnt[channel_id]--;
+
+	// that is, no reader is left in the critical section,
+	if (p_channelList->readerCnt[channel_id] == 0) 
+		signal(p_channelList->channel_writer_locks[channel_id]);// writers can enter
+
+	signal(p_channelList->channel_readers[channel_id]); // reader leaves
 }
