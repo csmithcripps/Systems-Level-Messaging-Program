@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #define NUM_CHANNELS 256
 
@@ -60,8 +61,8 @@ typedef struct channel{
 
 typedef struct SharedMemoryType{
     channel_t channels[NUM_CHANNELS];
-    int channel_readers[NUM_CHANNELS];
-    int channel_writer_locks[NUM_CHANNELS];
+    sem_t channel_readers[NUM_CHANNELS];
+    sem_t channel_writer_locks[NUM_CHANNELS];
     int readerCnt[NUM_CHANNELS]; 
 } sharedMemory_t;
 

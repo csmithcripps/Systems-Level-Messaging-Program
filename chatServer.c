@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <sys/shm.h>
 #include <time.h> 
+#include <semaphore.h>
 
 // Definitions Header File
 #include "defs.h"
@@ -40,6 +41,7 @@ serv_resp_t handle_next_channel(serv_req_t request);
 serv_resp_t handle_next(serv_req_t request);
 void start_reader(int channel_id);
 void rmv_reader(int channel_id);
+serv_resp_t handle_next(serv_req_t request);
 
 
 /********************************* Main Code *********************************/
@@ -163,10 +165,10 @@ serv_req_t handle_user_reqt(int socket_fd){
     if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
         perror("Receiving user coord request");
     }
-	printClientRequest(request);
 
 	// if Reader: Signal Semaphore to start reader
-	if (request.request_type != SEND) start_reader(request.channel_id);
+	// if (request.request_type != SEND) {start_reader(request.channel_id);
+	printClientRequest(request);
 
 	serv_resp_t response;
 	
@@ -227,7 +229,7 @@ serv_req_t handle_user_reqt(int socket_fd){
 		if (!numSubbed){
 			strcpy(response.message_text, "No Channels Subbed");
 		}else{
-			response = handle_next(request);		
+			// response = handle_next(request);		
 		}
 		break;
 
@@ -238,8 +240,9 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 	}
 	sendResponse(response);
+
 	// if Reader: Signal Semaphore to remove reader
-	if (request.request_type != SEND) rmv_reader(request.channel_id);
+	// if (request.request_type != SEND) rmv_reader(request.channel_id);
     return request;
 }
 
@@ -250,6 +253,13 @@ void closeServer(){
 	switch (client_fd)
 	{
 	case 0:
+		for(int i=0;i<NUM_CHANNELS;i++){   
+		if (sem_destroy(&(p_channelList->channel_readers[i])) ==-1 ||
+			sem_destroy(&(p_channelList->channel_writer_locks[i])) ==-1 ){
+            perror("sem_destroy");
+            exit(EXIT_FAILURE);
+        }
+		}
 		printf("\n<< Closing Server-Parent >>\n");
 		shmctl(shm_id, IPC_RMID, NULL);
 		break;
@@ -407,19 +417,10 @@ void storeMessage(serv_req_t request){
 	newMsg.client_id = client_fd;
 	strcpy(newMsg.message_text, request.message_text);
 
-	if (pthread_mutex_lock(&(p_channelList->channel_locks[request.channel_id]))) {
-		perror("pthread_mutex_lock");
-		closeServer();
-	}
-
 	p_channelList->channels[request.channel_id].messages[p_channelList->channels[request.channel_id].numMsgs] = newMsg;
 	p_channelList->channels[request.channel_id].numMsgs += 1;
 	p_channelList->channels[request.channel_id].lastEdited = time(NULL);
 	
-	if (pthread_mutex_unlock(&(p_channelList->channel_locks[request.channel_id]))) {
-		perror("pthread_mutex_unlock");
-		closeServer();
-	}
 }
 
 
@@ -473,7 +474,7 @@ serv_resp_t handle_next_channel(serv_req_t request){
 
 void start_reader(int channel_id){    
    // Reader wants to enter the critical section
-   wait(p_channelList->channel_readers[channel_id]);
+   sem_wait(&(p_channelList->channel_readers[channel_id]));
 
    // Increase Reader count for channel_id
    p_channelList->readerCnt[channel_id]++;                   
@@ -481,20 +482,20 @@ void start_reader(int channel_id){
    // ensure that no writers can enter this critical section
    // when at least 1 reader is reading 
    if (p_channelList->readerCnt[channel_id]==1)     
-      wait(p_channelList->channel_writer_locks[channel_id]);                    
+      sem_wait(&(p_channelList->channel_writer_locks[channel_id]));                    
 
    // Allow multiple readers to enter the critical section
-   signal(p_channelList->channel_readers[channel_id]);          
+   sem_post(&(p_channelList->channel_readers[channel_id]));          
 }
 
 void rmv_reader(int channel_id){
-	wait(p_channelList->channel_readers[channel_id]);// a reader wants to leave
+	sem_wait(&(p_channelList->channel_readers[channel_id]));// a reader wants to leave
 
 	p_channelList->readerCnt[channel_id]--;
 
 	// that is, no reader is left in the critical section,
 	if (p_channelList->readerCnt[channel_id] == 0) 
-		signal(p_channelList->channel_writer_locks[channel_id]);// writers can enter
+		sem_post(&(p_channelList->channel_writer_locks[channel_id]));// writers can enter
 
-	signal(p_channelList->channel_readers[channel_id]); // reader leaves
+	sem_post(&(p_channelList->channel_readers[channel_id])); // reader leaves
 }
