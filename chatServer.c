@@ -97,8 +97,11 @@ int main(int argc, char *argv[])
 
 	// Init Variables for critical section solution
 	for(int i=0;i<NUM_CHANNELS;i++){   
-		if (sem_init(&(p_channelList->channel_readers[i]), 1, 0) ==-1 ||
-			sem_init(&(p_channelList->channel_writer_locks[i]), 1, 0) ==-1 ){
+		if (sem_init(&(p_channelList->channel_readers[i]), 1, 1) ==-1){
+            perror("sem_init");
+            exit(EXIT_FAILURE);
+        }
+		if(sem_init(&(p_channelList->channel_writer_locks[i]), 1, 1) ==-1 ){
             perror("sem_init");
             exit(EXIT_FAILURE);
         }
@@ -167,7 +170,9 @@ serv_req_t handle_user_reqt(int socket_fd){
     }
 
 	// if Reader: Signal Semaphore to start reader
-	// if (request.request_type != SEND) {start_reader(request.channel_id);
+	if (request.request_type != SEND) {
+		start_reader(request.channel_id);
+	}
 	printClientRequest(request);
 
 	serv_resp_t response;
@@ -239,10 +244,12 @@ serv_req_t handle_user_reqt(int socket_fd){
 		printf("<< Invalid Request Received From %d >>\n", client_fd);
 		break;
 	}
+	if (request.request_type != SEND) {
+		rmv_reader(request.channel_id);
+	}
 	sendResponse(response);
 
 	// if Reader: Signal Semaphore to remove reader
-	// if (request.request_type != SEND) rmv_reader(request.channel_id);
     return request;
 }
 
@@ -477,7 +484,7 @@ void start_reader(int channel_id){
    sem_wait(&(p_channelList->channel_readers[channel_id]));
 
    // Increase Reader count for channel_id
-   p_channelList->readerCnt[channel_id]++;                   
+   (p_channelList->readerCnt[channel_id])++;                   
 
    // ensure that no writers can enter this critical section
    // when at least 1 reader is reading 
@@ -485,7 +492,8 @@ void start_reader(int channel_id){
       sem_wait(&(p_channelList->channel_writer_locks[channel_id]));                    
 
    // Allow multiple readers to enter the critical section
-   sem_post(&(p_channelList->channel_readers[channel_id]));          
+   sem_post(&(p_channelList->channel_readers[channel_id]));     
+   return;     
 }
 
 void rmv_reader(int channel_id){
@@ -498,4 +506,5 @@ void rmv_reader(int channel_id){
 		sem_post(&(p_channelList->channel_writer_locks[channel_id]));// writers can enter
 
 	sem_post(&(p_channelList->channel_readers[channel_id])); // reader leaves
+	return;
 }
