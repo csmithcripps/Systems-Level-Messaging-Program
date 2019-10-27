@@ -200,6 +200,14 @@ serv_req_t handle_user_reqt(int socket_fd){
 		response.type = PRINT;
 		strcpy(response.message_text, "Server Connection Closed");
 		break;
+
+	// case LIVEFEED:
+	// 	if(!livefeedON){
+	// 		response.type = PRINT;
+	// 		strcpy(response.message_text, "Live feed is already active.");
+	// 		break;
+	// 	}
+	// 	start_livefeed_channel(request);
 	
 	case SEND:
 		storeMessage(request);
@@ -371,6 +379,9 @@ Func:       Initialises the Shared Memory (shm) segment (USED BY PARENT PROCESS)
 Param:      
             int key:
                     The identifier for the shm segment
+Ret:		
+			sharedMemory_t * p_ChannelList:
+					A pointer to the shared memory object
 */
 sharedMemory_t * init_Shared_Memory(int key){
 	sharedMemory_t * p_ChannelList = malloc(sizeof(sharedMemory_t));
@@ -413,6 +424,15 @@ sharedMemory_t * get_Shared_Memory(int key){
 	return p_ChannelList;
 }
 
+
+/*
+Func:       Store messages sent into shared memory:
+				This is the writer (readers-writers problem)
+				Waits on the writer lock before writing
+Param:      
+            serv_req_t request:
+                    The client request -- Including the channel and message text
+*/
 void storeMessage(serv_req_t request){
 	msg_t newMsg;
 	newMsg.channel_id = request.channel_id;
@@ -427,7 +447,17 @@ void storeMessage(serv_req_t request){
 	
 }
 
-
+/*
+Func:       Handle the NEXT_CHANNEL request:
+				Check if the channel is valid
+				send the next unread message on the channel
+Param:      
+            serv_req_t request:
+                    The client request
+Ret:		
+			serv_resp_t response:
+					The response to be sent to the client.
+*/
 serv_resp_t handle_next_channel(serv_req_t request){
 	serv_resp_t response;
 	//If channel doesnt exist print message
@@ -459,6 +489,18 @@ serv_resp_t handle_next_channel(serv_req_t request){
 	return response;
 }
 
+
+/*
+Func:       Handle the NEXT command:
+				Find the most recently editted channel that is subscribed to
+				Send the NEXT message on that channel to the client
+Param:      
+            serv_req_t request:
+                    The client request
+Ret:		
+			serv_resp_t response:
+					The response to be sent to the client.
+*/
 serv_resp_t handle_next(serv_req_t request){
 	serv_resp_t response;
 	response.type = PRINT;
@@ -513,6 +555,15 @@ serv_resp_t handle_next(serv_req_t request){
 	return response;
 }
 
+/*
+Func:       Run code for reader to enter the critical section
+				ensure that at no point is there a reader and a writer in the
+				critical section at the same time
+Param:      
+            int kchannel_id:
+					The channel no. in use.
+					Identify which channel to lock.
+*/
 void start_reader(int channel_id){    
    // Reader wants to enter the critical section
    sem_wait(&(p_channelList->channel_readers[channel_id]));
@@ -530,6 +581,16 @@ void start_reader(int channel_id){
    return;     
 }
 
+
+/*
+Func:       Run code for reader to exit the critical section
+				release lock on writers if this is the last reader in the 
+				section.
+Param:      
+            int channel_id:
+                    the channel number of the channel in use
+					used to identify which channel to unlock
+*/
 void rmv_reader(int channel_id){
 	sem_wait(&(p_channelList->channel_readers[channel_id]));// a reader wants to leave
 
