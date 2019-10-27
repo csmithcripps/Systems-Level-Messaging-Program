@@ -169,10 +169,6 @@ Param:
 serv_req_t handle_user_reqt(int socket_fd){
     serv_req_t request;
 	
-	/* Thread attributes */
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-
     if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
         perror("Receiving user coord request");
     }
@@ -204,13 +200,41 @@ serv_req_t handle_user_reqt(int socket_fd){
 		response.type = PRINT;
 		strcpy(response.message_text, "Server Connection Closed");
 		break;
+
+	// case LIVEFEED:
+	// 	if(!livefeedON){
+	// 		response.type = PRINT;
+	// 		strcpy(response.message_text, "Live feed is already active.");
+	// 		break;
+	// 	}
+	// 	start_livefeed_channel(request);
 	
 	case SEND:
 		storeMessage(request);
 		response.type = PRINT;
 		strcpy(response.message_text, "Message Received");
 		break;
-	
+
+	case CHANNELS:
+
+		serv_resp_t response;
+		for ( i = 0; i <= 256; i ++ )
+		{
+			if ( subbed[i] == 1 )
+			{
+				int numSent = p_channelList -> channel[i].numMsgs;
+				int numNotRead = numSent - numRead[i];
+
+				response.type = PRINT;
+				snprintf( response.message_text, 1000,"Channel  %d: %d messages, Number of read messages: %d, Number of unread messages %d", i, numSent, numRead, numNotRead );
+				sendResponse(response);
+			}
+		}
+		
+		response.type = END;
+		sendResponse(response);
+		break;
+		
 	case SUB:
         if ( request. channel_id < 0 || request.channel_id > 255 ){
             response.type = PRINT;
@@ -309,6 +333,11 @@ void printClientRequest(serv_req_t request){
 		printf("##  Req_Type: SUB\n");
 		printf("##    Channel_id: %d\n", request.channel_id);
 		printf("##    Action: Change Subbed[%d] to 1\n", request.channel_id);
+		break;
+
+	case CHANNELS:
+		printf("##  Req_Type: CHANNELS\n");
+		printf("##    Action: Show all channels user is subscribed too\n");
 		break;
 		
 	case UNSUB:
