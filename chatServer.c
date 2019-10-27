@@ -28,6 +28,9 @@ int shm_id;
 int subbed[NUM_CHANNELS] = {0}; //If the value at subbed[channel_id] == 1, channel is subbed.
 int numRead[NUM_CHANNELS] = {0}; // Add 1 if message is opened 
 int msgWhenSubbed[NUM_CHANNELS] = {0}; // Set to numRead when client subscribes
+pthread_t livefeedThread;
+int livefeedON = 0;
+
 
 /***************************** Function Inits ********************************/
 serv_req_t handle_user_reqt(int socket_fd);
@@ -106,6 +109,7 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 		p_channelList->readerCnt[i] = 0;
+		p_channelList->channels[i].lastEdited = time(NULL);
     }
 
     printf("<< Started Execution of Chat Server >>\n\n");
@@ -169,11 +173,8 @@ serv_req_t handle_user_reqt(int socket_fd){
         perror("Receiving user coord request");
     }
 
-	// if Reader: Signal Semaphore to start reader
-	if (request.request_type != SEND) {
-		start_reader(request.channel_id);
-	}
 	printClientRequest(request);
+	printf("!!!!!\n");
 
 	serv_resp_t response;
 	
@@ -224,18 +225,13 @@ serv_req_t handle_user_reqt(int socket_fd){
 		break;
 
 	case NEXT_CHANNEL:
+		start_reader(request.channel_id);
 		response = handle_next_channel(request);
+		rmv_reader(request.channel_id);
 		break;
 
 	case NEXT:
-		response.type = PRINT;
-		int numSubbed = 0;
-		for (int i = 0; i < NUM_CHANNELS; i++) numSubbed += subbed[i];
-		if (!numSubbed){
-			strcpy(response.message_text, "No Channels Subbed");
-		}else{
-			// response = handle_next(request);		
-		}
+		response = handle_next(request);		
 		break;
 
 	default:
@@ -244,12 +240,11 @@ serv_req_t handle_user_reqt(int socket_fd){
 		printf("<< Invalid Request Received From %d >>\n", client_fd);
 		break;
 	}
-	if (request.request_type != SEND) {
-		rmv_reader(request.channel_id);
-	}
+	printf("##  FINISHED HANDLING\n");
 	sendResponse(response);
+	printf("##    Response sent to client %d\n",client_fd);
 
-	// if Reader: Signal Semaphore to remove reader
+	printf("!!!!!\n");
     return request;
 }
 
@@ -424,9 +419,11 @@ void storeMessage(serv_req_t request){
 	newMsg.client_id = client_fd;
 	strcpy(newMsg.message_text, request.message_text);
 
+	sem_wait(&(p_channelList->channel_writer_locks[request.channel_id]));
 	p_channelList->channels[request.channel_id].messages[p_channelList->channels[request.channel_id].numMsgs] = newMsg;
 	p_channelList->channels[request.channel_id].numMsgs += 1;
 	p_channelList->channels[request.channel_id].lastEdited = time(NULL);
+	sem_post(&(p_channelList->channel_writer_locks[request.channel_id]));
 	
 }
 
@@ -462,29 +459,66 @@ serv_resp_t handle_next_channel(serv_req_t request){
 	return response;
 }
 
-// serv_resp_t handle_next(serv_req_t request){
-// 	serv_resp_t response;
+serv_resp_t handle_next(serv_req_t request){
+	serv_resp_t response;
+	response.type = PRINT;
+
+	/* FIND THE LAST EDITED SUBBED CHANNEL */
+	int numSubbed = 0;
+	for (int i = 0; i < NUM_CHANNELS; i++) numSubbed += subbed[i];
+	if (!numSubbed){
+		strcpy(response.message_text, "No Channels Subbed");
+		printf("##  CLIENT IS NOT SUBBED TO ANY CHANNELS\n");
+		return response;
+	}
+
+
+	// printf("FINDING FIRST CHANNEL\n");
+	request.channel_id = 500;
+	for (int i=0; i<NUM_CHANNELS; i++){
+		if (!subbed[i]) continue;
+		if (p_channelList->channels[i].numMsgs <=(msgWhenSubbed[i] + numRead[i])) continue;
+		if (subbed[i]){
+			request.channel_id = i;
+			break;
+		}	
+	}
 	
+	double changeInTime;
+	for (int i = request.channel_id; i<NUM_CHANNELS; i++){
+		if (!subbed[i]) continue;
+		if (p_channelList->channels[i].numMsgs <=(msgWhenSubbed[i] + numRead[i])) continue;
+		changeInTime = difftime(p_channelList->channels[i].lastEdited, p_channelList->channels[request.channel_id].lastEdited);
+		if (changeInTime > 0)
+			request.channel_id = i;
+	}
+	// printf("LAST EDITED WAS %d", request.channel_id);
+	if(request.channel_id == 500){
+		strcpy(response.message_text, "No New Messages to show");
+		return response;
+	}
 
+	start_reader(request.channel_id);
+	/* Get Message from channel */
 
+	int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
+	channel_t tempchannel = p_channelList -> channels[request.channel_id];
+	msg_t tempmessage = tempchannel.messages[currentmessage];
 
-// 	int currentmessage = msgWhenSubbed[request.channel_id] + numRead[request.channel_id];
-// 	channel_t tempchannel = p_channelList -> channels[request.channel_id];
-// 	msg_t tempmessage = tempchannel.messages[currentmessage];
+	snprintf( response.message_text, 1024, "%d: %s", request.channel_id, tempmessage.message_text );
 
-// 	response.type = PRINT;
-// 	snprintf( response.message_text, 1024, "%s", tempmessage.message_text );
+	numRead[request.channel_id]++;
 
-// 	numRead[request.channel_id]++;
-// 	return response;
-// }
+	rmv_reader(request.channel_id);
+	return response;
+}
 
 void start_reader(int channel_id){    
    // Reader wants to enter the critical section
    sem_wait(&(p_channelList->channel_readers[channel_id]));
 
    // Increase Reader count for channel_id
-   (p_channelList->readerCnt[channel_id])++;                   
+   (p_channelList->readerCnt[channel_id])++;
 
    // ensure that no writers can enter this critical section
    // when at least 1 reader is reading 
@@ -502,7 +536,7 @@ void rmv_reader(int channel_id){
 	p_channelList->readerCnt[channel_id]--;
 
 	// that is, no reader is left in the critical section,
-	if (p_channelList->readerCnt[channel_id] == 0) 
+	if (p_channelList->readerCnt[channel_id] == 0)
 		sem_post(&(p_channelList->channel_writer_locks[channel_id]));// writers can enter
 
 	sem_post(&(p_channelList->channel_readers[channel_id])); // reader leaves
