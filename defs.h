@@ -68,6 +68,14 @@ typedef struct SharedMemoryType{
 
 
 
+/* Requests Linked List Struct
+/* Struct of a single scoreboard entry */
+typedef struct queued_request queued_request_t;
+struct queued_request{
+    serv_req_t request;
+    queued_request_t * next;
+};
+
 
 
 

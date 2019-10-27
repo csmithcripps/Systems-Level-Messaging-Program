@@ -24,8 +24,16 @@
 
 #define PORT_NO 54321 /* PORT Number */
 
+#define QUEUE_SIZE 10
+
 /* User Connection Point */
 int socket_fd = 0;
+
+pthread_t p_thread;
+
+pthread_mutex_t request_mutex;
+
+queued_request_t * request_queue_head = NULL;
 
 /***************************** Function Inits ********************************/
 serv_req_t commandHandler();
@@ -37,11 +45,15 @@ req_t checkRequestType(char req[]);
 void handleResponse(serv_resp_t response);
 void printHelp();
 serv_req_t handle_next();
+void handle_request_loop(void * data);
+void add_request(serv_req_t * request);
+serv_req_t * get_req();
+void rmv_req();
 
 
 /********************************* Main Code *********************************/
 int main(int argc, char* argv[]){
-
+    int i;
     /* Set up the program to exit gracefully on SIGINT (CTRL-C) */
     signal(SIGINT, exitGracefully);
     signal(SIGHUP, exitGracefully);
@@ -51,6 +63,16 @@ int main(int argc, char* argv[]){
         printf("\nUsage --> %s [hostname] [port]\n\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+
+    int thread_ids[QUEUE_SIZE];
+    /* Thread attributes */
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+
+    int pthread_id = 1;
+    /* Create threads */
+    pthread_create(&p_thread, &attr, (void*) handle_request_loop, &pthread_id);
+    
 
     connectWithServer(argv);
 
@@ -132,8 +154,8 @@ Return:
 */
 serv_req_t commandHandler(){
         serv_req_t request;
+        serv_req_t * p_request = (serv_req_t *) malloc(sizeof(serv_req_t));
         char req[50];
-        printf("\n --> ");
         scanf("%s", req);
 
         request.request_type = checkRequestType(req);
@@ -142,32 +164,27 @@ serv_req_t commandHandler(){
         {
         case HELP:
             printHelp();
+            return request;
             break;
 
         case SUB:
             scanf("%d",&request.channel_id);
-            sendRequest(request);
             break;
 
         case UNSUB:
             scanf("%d",&request.channel_id);
-            sendRequest(request);
             break;
         
         case CHANNELS:
-            sendRequest(request);
-            printFromRecv();
             break;
 
         case NEXT:
             request = handle_next();
-            sendRequest(request);
             break;
 
         case SEND:
             scanf("%d",&request.channel_id);
             scanf("%[^\n]s",request.message_text);
-            sendRequest(request);
             break;
         
         case BYE:
@@ -176,12 +193,17 @@ serv_req_t commandHandler(){
 
         case INVALID:
             printf("\n<< INVALID INPUT >>\n");
+            return request;
             break;
         
         default:
-            sendRequest(request);
             break;
         }
+        p_request->request_type = request.request_type;
+        strcpy(p_request->message_text, request.message_text);
+        p_request->channel_id = request.channel_id;
+
+        add_request(p_request);
 
         return request;
 }
@@ -306,7 +328,7 @@ void printHelp(){
     printf("\n          --> If no channel_id is input, show next unread message from any subbed channel");
     printf("\n##  LIVEFEED <channel_id>\n        --> Display all unread messages on channel[channel_id], then display new messages as they come");
     printf("\n          --> If no channel_id is input, all subbed channels are displayed");
-    printf("\n##  SEND\n        --> Close connection and exit.");
+    printf("\n##  SEND <channel_id> <message>\n        --> SEND message to the server.");
     printf("\n##  BYE\n        --> Close connection and exit.");
     
     printf("\n\n");
@@ -358,4 +380,89 @@ serv_req_t handle_next(){
 }
 
 
-int ifChannel();
+void handle_request_loop(void * data){
+    
+    int thread_id = *((int *)data);
+    serv_req_t *request;
+
+
+    while(1){
+        if (request_queue_head != NULL){
+            pthread_mutex_lock(&request_mutex);
+            request = get_req();
+            pthread_mutex_unlock(&request_mutex);
+
+            if (request){
+                handle_req(*request);
+                rmv_req();
+            }
+        }
+    }
+}
+
+void handle_req(serv_req_t request){
+    switch (request.request_type)
+    {
+    case CHANNELS:
+        sendRequest(request);
+        printFromRecv();
+        break;
+    
+    default:
+        sendRequest(request);
+        break;
+    }
+}
+
+
+
+
+void add_request(serv_req_t * request){
+    queued_request_t *new_node = (queued_request_t*)malloc(sizeof(queued_request_t));
+    if(new_node == NULL)
+    {
+        return NULL;
+    }
+
+    pthread_mutex_lock(&request_mutex);
+    new_node->request.channel_id = request->channel_id;
+    new_node->request.request_type = request->request_type;
+    strcpy(new_node->request.message_text, request->message_text);
+    new_node->next= request_queue_head;
+
+    request_queue_head = new_node;
+    pthread_mutex_unlock(&request_mutex);
+}
+
+
+serv_req_t * get_req(){
+    queued_request_t *cursor = request_queue_head;
+    while(cursor!=NULL)
+    {
+        if(cursor->next == NULL)
+            return &(cursor->request);
+        cursor = cursor->next;
+    }
+    return NULL;
+}
+
+void rmv_req() {
+    queued_request_t *previous = NULL;
+    queued_request_t *current = request_queue_head;
+    while (current != NULL) {
+        if (current->next == NULL) {
+            if (previous == NULL)  // first item in list
+                request_queue_head = NULL;
+            else 
+                previous->next = current->next;
+            
+            free(current);
+            return;
+        }
+        previous = current;
+        current = current->next;
+    }
+    
+    // name not found
+    return;
+}

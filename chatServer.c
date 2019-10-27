@@ -169,6 +169,10 @@ Param:
 serv_req_t handle_user_reqt(int socket_fd){
     serv_req_t request;
 	
+	/* Thread attributes */
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+
     if (recv(socket_fd, &request, sizeof(serv_req_t),PF_UNSPEC) == -1){
         perror("Receiving user coord request");
     }
@@ -200,14 +204,6 @@ serv_req_t handle_user_reqt(int socket_fd){
 		response.type = PRINT;
 		strcpy(response.message_text, "Server Connection Closed");
 		break;
-
-	// case LIVEFEED:
-	// 	if(!livefeedON){
-	// 		response.type = PRINT;
-	// 		strcpy(response.message_text, "Live feed is already active.");
-	// 		break;
-	// 	}
-	// 	start_livefeed_channel(request);
 	
 	case SEND:
 		storeMessage(request);
